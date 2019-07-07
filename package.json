@@ -1,0 +1,24 @@
+{
+  "name": "notorm",
+  "version": "0.0.1",
+  "description": "This is not an ORM",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eduoda/notorm.git"
+  },
+  "author": "Eduardo Oda <oda@member.fsf.org>",
+  "bugs": {
+    "url": "https://github.com/eduoda/fisherjs/issues"
+  },
+  "homepage": "https://github.com/eduoda/fisherjs#readme",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "camelcase": "^5.3.1",
+    "decamelize": "^3.2.0",
+    "fisherjs": "0.0.1"
+  }
+}
