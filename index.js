@@ -17,6 +17,8 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
   if(_autoIncrement && _objPrimaryKey.length>1)
     console.error("Auto increment works only with simple a primary key.");
 
+  let _classNameCapit = _className[0].toUpperCase() + _className.slice(1)
+
   // helper function
   function _isSet(o){
     return typeof o !== 'undefined';
@@ -101,7 +103,7 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
 
     // CRUD stuff
     async save(conn){
-      await _emitter.emit('entityPreSave'+_className,conn,this);
+      await _emitter.emit('entityPreSave'+_classNameCapit,conn,this);
       let create = _objPrimaryKey.reduce((a,key) => !_isSet(this[key]) && a,true)
       if(create)
         return await this.create(conn);
@@ -109,7 +111,7 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
     }
 
     async create(conn){
-      await _emitter.emit('entityPreCreate'+_className,conn,this);
+      await _emitter.emit('entityPreCreate'+_classNameCapit,conn,this);
       let cols = _sqlColumns.filter((col,i) => _isSet(this[_objProperties[i]]));
       let values = _objProperties.filter(prop => _isSet(this[prop])).map(prop => this[prop]);
       const query = `
@@ -119,21 +121,21 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
       let id = await this.constructor.rawInsert(conn,query,values);
       if(_autoIncrement)
         this[_objPrimaryKey[0]]=id;
-      await _emitter.emit('entityCreate'+_className,conn,this);
-      await _emitter.emit('entityLoad'+_className,conn,this);
+      await _emitter.emit('entityCreate'+_classNameCapit,conn,this);
+      await _emitter.emit('entityLoad'+_classNameCapit,conn,this);
       return this;
     }
 
     async update(conn){
-      await _emitter.emit('entityPreUpdate'+_className,conn,this);
+      await _emitter.emit('entityPreUpdate'+_classNameCapit,conn,this);
       let cols = _sqlColumns.filter((col,i) => !_sqlPrimaryKey.includes(col) && _isSet(this[_objProperties[i]])).map(col => col+' = ?');
       let values = _objProperties.filter(prop => !_objPrimaryKey.includes(prop) && _isSet(this[prop])).map(prop => this[prop]);
       let where = _sqlPrimaryKey.map(pk => pk+' = ?');
       values = values.concat(_objPrimaryKey.map(prop => this[prop]));
       const query = `UPDATE ${_table} SET ${cols.join(',')} WHERE ${where.join(' AND ')};`;
       await this.constructor.rawUpdate(conn,query,values);
-      await _emitter.emit('entityUpdate'+_className,conn,this);
-      await _emitter.emit('entityLoad'+_className,conn,this);
+      await _emitter.emit('entityUpdate'+_classNameCapit,conn,this);
+      await _emitter.emit('entityLoad'+_classNameCapit,conn,this);
       return this;
     }
 
@@ -144,22 +146,22 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
       let rows = await this.constructor.rawAll(conn,query,values);
       if(rows.length==0) throw 404;
       Object.assign(this,_camelizeObject(rows[0]));
-      await _emitter.emit('entityLoad'+_className,conn,this);
+      await _emitter.emit('entityLoad'+_classNameCapit,conn,this);
       return this;
     }
 
     async delete(conn){
-      await _emitter.emit('entityPredelete'+_className,conn,this);
+      await _emitter.emit('entityPredelete'+_classNameCapit,conn,this);
       let where = _sqlPrimaryKey.map(pk => pk+' = ?');
       let values = _objPrimaryKey.map(prop => this[prop]);
       let query = `DELETE FROM ${_table} WHERE ${where.join(' AND ')};`;
       await this.constructor.rawDelete(conn,query,values);
-      await _emitter.emit('entityDelete'+_className,conn,this);
+      await _emitter.emit('entityDelete'+_classNameCapit,conn,this);
       return this;
     }
 
     async prepare(conn){
-      await _emitter.emit('entityPrepare'+_className,conn,this);
+      await _emitter.emit('entityPrepare'+_classNameCapit,conn,this);
       return this;
     }
 
@@ -214,10 +216,10 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
         let results = [];
         rows.forEach((row) => {
           let e = new namedClass[_className](_camelizeObject(row));
-          _emitter.emit('entityLoad'+_className,conn,e);
+          _emitter.emit('entityLoad'+_classNameCapit,conn,e);
           results.push(e);
         });
-        _emitter.emit('entityLoadMultiple'+_className,conn,results);
+        _emitter.emit('entityLoadMultiple'+_classNameCapit,conn,results);
         return results;
       })
     }
