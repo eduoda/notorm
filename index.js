@@ -235,7 +235,7 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
 
       if(!Array.isArray(op)) op = [op];
       while(op.length<cols.length-1)
-        fuzzy.push(op[op.length-1]);
+        op.push(op[op.length-1]);
 
       let where = cols.map((col,i) => col+(fuzzy[i]?' LIKE ?':' = ?')).reduce((w,curr,i) => `${w} ${op[i-1]} ${curr}`);
       values = _objProperties.filter(prop => _isSet(values[prop])).map(prop => values[prop]);
