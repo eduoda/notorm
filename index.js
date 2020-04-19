@@ -148,6 +148,22 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
       return this;
     }
 
+    async first(conn){
+      let values = [];
+      let where = [];
+      _sqlColumns.forEach((col,i) => {
+        if(!_isSet(this[_objProperties[i]])) return;
+        where.push(col+' = ?');
+        values.push(this[_objProperties[i]]);
+      });
+      let query = `SELECT * FROM ${_table} WHERE ${where.join(' AND ')} LIMIT 1;`;
+      let rows = await this.constructor.rawAll(conn,query,values);
+      if(rows.length==0) throw 404;
+      Object.assign(this,_camelizeObject(rows[0]));
+      await _emitter.emit('entityLoad'+_className,conn,this);
+      return this;
+    }
+
     async delete(conn){
       await _emitter.emit('entityPredelete'+_className,conn,this);
       let where = _sqlPrimaryKey.map(pk => pk+' = ?');
