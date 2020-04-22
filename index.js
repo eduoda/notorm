@@ -229,8 +229,10 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
       return this.rawAll(conn,query,values).then(rows => {
         let results = [];
         rows.forEach((row) => {
-          let e = new namedClass[_className](_camelizeObject(row));
-          _emitter.emit('entityLoad'+_className,conn,e);
+          //https://stackoverflow.com/questions/39429207/return-a-new-instance-of-child-class-from-base-class-static-method
+          // let e = new namedClass[_className](_camelizeObject(row));
+          let e = new this(_camelizeObject(row));
+          //_emitter.emit('entityLoad'+_className,conn,e);
           results.push(e);
         });
         _emitter.emit('entityLoadMultiple'+_className,conn,results);
