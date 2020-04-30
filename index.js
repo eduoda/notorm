@@ -120,8 +120,7 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
       if(_autoIncrement)
         this[_objPrimaryKey[0]]=id;
       await _emitter.emit('entityCreate'+_className,conn,this);
-      await _emitter.emit('entityLoad'+_className,conn,this);
-      return this;
+      return await this.load(conn);
     }
 
     async update(conn){
@@ -133,8 +132,7 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
       const query = `UPDATE ${_table} SET ${cols.join(',')} WHERE ${where.join(' AND ')};`;
       await this.constructor.rawUpdate(conn,query,values);
       await _emitter.emit('entityUpdate'+_className,conn,this);
-      await _emitter.emit('entityLoad'+_className,conn,this);
-      return this;
+      return await this.load(conn);
     }
 
     async load(conn){
