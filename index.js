@@ -103,9 +103,13 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
     async save(conn){
       await _emitter.emit('entityPreSave'+_className,conn,this);
       let create = _objPrimaryKey.reduce((a,key) => !_isSet(this[key]) && a,true)
+      let ret;
       if(create)
-        return await this.create(conn);
-      return await this.update(conn);
+        ret = await this.create(conn);
+      else
+        ret = await this.update(conn);
+      await _emitter.emit('entitySave'+_className,conn,this);
+      return ret;
     }
 
     async create(conn){
