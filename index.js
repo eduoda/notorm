@@ -114,7 +114,11 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
       return this.timestampToLocalDatetime(Date.now());
     }
     static getSQLColumns() {
-      return _table+'.'+_sqlColumns.join(','+_table+'.');
+      return _sqlColumns.map(col => {
+        if(_geoSqlColumnsName.includes(col))
+          return 'ST_AsGeoJSON('+_table+'.'+col+') AS ' + col;
+        return _table+'.'+col;
+      }).join(',');
     }
 
     // CRUD stuff
