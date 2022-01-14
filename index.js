@@ -182,7 +182,7 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
 
       let cols = _sqlColumns.map(col => {
         if(_geoSqlColumnsName.includes(col))
-          return 'ST_GeomFromGeoJSON('+col+') AS ' + col;
+          return 'ST_AsGeoJSON('+col+') AS ' + col;
         return col;
       }).join(',');
       let query = `SELECT ${cols} FROM ${_table} WHERE ${where.join(' AND ')};`;
