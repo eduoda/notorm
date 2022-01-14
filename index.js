@@ -14,6 +14,15 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
   let _objPrimaryKey = _columns.filter(value => value.primaryKey).map(value => camelize(value.name));
   let _autoIncrement = _columns.filter(value => value.primaryKey && value.autoIncrement).length>0;
 
+  let _geoColumnsName = _columns.reduce((ret, col, i) => {
+    if(col.type.toUpperCase()=="GEOMETRY") ret.push(_objProperties[i]);
+    return ret;
+  }, []);
+  let _geoSqlColumnsName = _columns.reduce((ret, col, i) => {
+    if(col.type.toUpperCase()=="GEOMETRY") ret.push(_sqlColumns[i]);
+    return ret;
+  }, []);
+
   if(_autoIncrement && _objPrimaryKey.length>1)
     console.error("Auto increment works only with simple a primary key.");
 
@@ -64,9 +73,18 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
         return idxs;
       },[]);
 
+      let uniqueIndexes = _dbFlavor!='mysql'? []:_columns.filter(col => col.uniqueIndex).reduce(function(idxs,col){
+        if(!_isSet(idxs[col.uniqueIndex])) idxs[col.uniqueIndex] = [];
+        idxs[col.uniqueIndex].push(decamelize(col.name));
+        return idxs;
+      },[]);
+
       let sqlIndexes = [];
       Object.keys(indexes).forEach(idxName => {
         sqlIndexes.push(`INDEX ${idxName} (${indexes[idxName].join(',')})`)
+      })
+      Object.keys(uniqueIndexes).forEach(idxName => {
+        sqlIndexes.push(`UNIQUE INDEX ${idxName} (${uniqueIndexes[idxName].join(',')})`)
       })
       let query = `
         CREATE TABLE IF NOT EXISTS ${_table} (
@@ -115,10 +133,19 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
     async create(conn){
       await _emitter.emit('entityPreCreate'+_className,conn,this);
       let cols = _sqlColumns.filter((col,i) => _isSet(this[_objProperties[i]]));
-      let values = _objProperties.filter(prop => _isSet(this[prop])).map(prop => this[prop]);
+      let placeholders = [];
+      let values = _objProperties.filter(prop => _isSet(this[prop])).map(prop => {
+        if(_geoColumnsName.includes(prop)){
+          placeholders.push("ST_GeomFromGeoJSON(?)");
+          return JSON.stringify(this[prop]);
+        }
+        placeholders.push("?");
+        return this[prop];
+      });
+
       const query = `
         INSERT INTO ${_table} (${cols.join(',')})
-        VALUES (${Array(cols.length).fill('?').join(',')});
+        VALUES (${placeholders.join(',')});
       `;
       let id = await this.constructor.rawInsert(conn,query,values);
       if(_autoIncrement)
@@ -129,8 +156,18 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
 
     async update(conn){
       await _emitter.emit('entityPreUpdate'+_className,conn,this);
-      let cols = _sqlColumns.filter((col,i) => !_sqlPrimaryKey.includes(col) && _isSet(this[_objProperties[i]])).map(col => col+' = ?');
-      let values = _objProperties.filter(prop => !_objPrimaryKey.includes(prop) && _isSet(this[prop])).map(prop => this[prop]);
+      let cols = _sqlColumns.filter((col,i) => !_sqlPrimaryKey.includes(col) && _isSet(this[_objProperties[i]])).map(col => {
+        if(_geoSqlColumnsName.includes(col)){
+          return col+' = ST_GeomFromGeoJSON(?)';
+        }
+        return col+' = ?';
+      });
+      let values = _objProperties.filter(prop => !_objPrimaryKey.includes(prop) && _isSet(this[prop])).map(prop => {
+        if(_geoColumnsName.includes(prop)){
+          return JSON.stringify(this[prop]);
+        }
+        return this[prop];
+      });
       let where = _sqlPrimaryKey.map(pk => pk+' = ?');
       values = values.concat(_objPrimaryKey.map(prop => this[prop]));
       const query = `UPDATE ${_table} SET ${cols.join(',')} WHERE ${where.join(' AND ')};`;
@@ -142,10 +179,20 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
     async load(conn){
       let where = _sqlPrimaryKey.map(pk => pk+' = ?');
       let values = _objPrimaryKey.map(prop => this[prop]);
-      let query = `SELECT * FROM ${_table} WHERE ${where.join(' AND ')};`;
+
+      let cols = _sqlColumns.map(col => {
+        if(_geoSqlColumnsName.includes(col))
+          return 'ST_GeomFromGeoJSON('+col+') AS ' + col;
+        return col;
+      }).join(',');
+      let query = `SELECT ${cols} FROM ${_table} WHERE ${where.join(' AND ')};`;
       let rows = await this.constructor.rawAll(conn,query,values);
       if(rows.length==0) throw 404;
       Object.assign(this,_camelizeObject(rows[0]));
+      _geoColumnsName.forEach(col => {
+        if(this[col] && typeof this[col] == "string")
+          this[col] = JSON.parse(this[col]);
+      })
       await _emitter.emit('entityLoad'+_className,conn,this);
       return this;
     }
@@ -158,15 +205,26 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
         where.push(col+' = ?');
         values.push(this[_objProperties[i]]);
       });
-      let query = `SELECT * FROM ${_table} WHERE ${where.join(' AND ')} LIMIT 1;`;
+      let cols = _sqlColumns.map(col => {
+        if(_geoSqlColumnsName.includes(col))
+          return 'ST_GeomFromGeoJSON('+col+') AS ' + col;
+        return col;
+      }).join(',');
+      let query = `SELECT ${cols} FROM ${_table} WHERE ${where.join(' AND ')} LIMIT 1;`;
       let rows = await this.constructor.rawAll(conn,query,values);
       if(rows.length==0) throw 404;
       Object.assign(this,_camelizeObject(rows[0]));
+      _geoColumnsName.forEach(col => {
+        if(this[col] && typeof this[col] == "string")
+          this[col] = JSON.parse(this[col]);
+      })
       await _emitter.emit('entityLoad'+_className,conn,this);
       return this;
     }
 
     async delete(conn){
+      await _emitter.emit('entityPreDelete'+_className,conn,this);
+      // TODO: remove this backward compatibility
       await _emitter.emit('entityPredelete'+_className,conn,this);
       let where = _sqlPrimaryKey.map(pk => pk+' = ?');
       let values = _objPrimaryKey.map(prop => this[prop]);
@@ -234,6 +292,10 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
           //https://stackoverflow.com/questions/39429207/return-a-new-instance-of-child-class-from-base-class-static-method
           // let e = new namedClass[_className](_camelizeObject(row));
           let e = new this(_camelizeObject(row));
+          _geoColumnsName.forEach(col => {
+            if(e[col] && typeof e[col] == "string")
+              e[col] = JSON.parse(e[col]);
+          })
           //_emitter.emit('entityLoad'+_className,conn,e);
           results.push(e);
         });
@@ -243,7 +305,12 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
     }
 
     static list(conn,offset,limit){
-      return this.runSelect(conn,`SELECT * FROM ${_table} LIMIT ${offset},${limit}`,[]);
+      let cols = _sqlColumns.map(col => {
+        if(_geoSqlColumnsName.includes(col))
+          return 'ST_GeomFromGeoJSON('+col+') AS ' + col;
+        return col;
+      }).join(',');
+      return this.runSelect(conn,`SELECT ${cols} FROM ${_table} LIMIT ${offset},${limit}`,[]);
     }
 
     static search(conn,values,offset,limit,fuzzy=false,op='AND',whereInjection='',whereValuesInjection=[],selectInjection='',joinInjection=''){
