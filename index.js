@@ -28,7 +28,7 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
 
   // helper function
   function _isSet(o){
-    return typeof o !== 'undefined';
+    return typeof o !== 'undefined' && o!==null;
   }
 
   // helper function

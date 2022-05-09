@@ -1,6 +1,6 @@
 {
   "name": "notorm",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "This is not an ORM",
   "main": "index.js",
   "scripts": {
