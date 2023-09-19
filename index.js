@@ -290,7 +290,7 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
 
     // class aware static methods (emit events)
     static runSelect(conn,query,values){
-      return this.rawAll(conn,query,values).then(rows => {
+      return this.rawAll(conn,query,values).then(async rows => {
         let results = [];
         rows.forEach((row) => {
           //https://stackoverflow.com/questions/39429207/return-a-new-instance-of-child-class-from-base-class-static-method
@@ -303,7 +303,7 @@ module.exports = ({_dbFlavor,_emitter,_className,_table,_columns}) => {
           //_emitter.emit('entityLoad'+_className,conn,e);
           results.push(e);
         });
-        _emitter.emit('entityLoadMultiple'+_className,conn,results);
+        await _emitter.emit('entityLoadMultiple'+_className,conn,results);
         return results;
       })
     }
